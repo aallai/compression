@@ -22,6 +22,12 @@ void bitstream::append(string const& bits)
 	}
 }
 
+void bitstream::append(uint64_t bits, unsigned int width)
+{
+	for (int i = --width; i >= 0; i--)
+		append_bit((bits >> i) & 1);
+}
+
 void bitstream::append_bit(bool bit)
 {
 	auto index = position / 8;
@@ -41,9 +47,8 @@ void bitstream::append_bit(bool bit)
 
 void bitstream::print()
 {
-	cout << hex << setw(2) << setfill('0');
 	for (auto const& byte : buf)
-		cout << byte;
+		printf("%02x", byte);
 }
 
 }

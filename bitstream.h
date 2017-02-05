@@ -8,7 +8,7 @@ public:
 	bitstream();
 
 	void append(std::string const& bits);
-	//void append(uint64_t bits, unsigned int width);
+	void append(uint64_t bits, unsigned int width);
 	void print();
 
 private:
