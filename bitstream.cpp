@@ -1,5 +1,3 @@
-#include <iostream>
-#include <iomanip>
 #include <cassert>
 #include "bitstream.h"
 
@@ -62,7 +60,6 @@ void bitstream::append_bit(bool bit)
     if (bit)
     {
         auto offset = write_head % 8;
-
         buf[index] |= (1 << (7 - offset));
     }
 
@@ -85,6 +82,16 @@ void bitstream::print()
 {
     for (auto const& byte : buf)
     printf("%02x", byte);
+}
+
+uint64_t bitstream::size()
+{
+    return write_head;
+}
+
+bool bitstream::has_unread_bits()
+{
+    return read_head < write_head;
 }
 
 }

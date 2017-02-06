@@ -1,3 +1,7 @@
+
+#ifndef __compression_bitstream__
+#define __compression_bitstream__
+
 #include <vector>
 
 namespace compression {
@@ -14,6 +18,8 @@ public:
 	uint64_t read_word(unsigned int width);
 
 	void print();
+    uint64_t size();
+    bool has_unread_bits();
 
 private:
 	void append_bit(bool bit);
@@ -25,3 +31,5 @@ private:
 };
 
 }
+
+#endif
