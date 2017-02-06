@@ -120,6 +120,7 @@ void engine::compress_timestamp(uint64_t timestamp, bitstream& stream)
     else
     {
         assert(d < 0x100000000);
+        stream.append("1111");
         stream.append(d, 32);
     }
 }
