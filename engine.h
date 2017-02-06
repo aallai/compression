@@ -24,6 +24,8 @@ private:
     void compress_value(double value, bitstream& stream);
     void initialize_deltas(datapoint& first, datapoint& second, bitstream& stream);
 
+    // Timestamp compression uses the last two timestamps.
+    // Value compression uses the previous value, the previous xor's leading zeros, trailing zeros and meaningful bits.
     uint64_t tn_1, tn_2, previous_value;
     int previous_lz, previous_tz, previous_mb_length;
 };

@@ -22,6 +22,8 @@ public:
     bool has_unread_bits();
 
 private:
+
+    // Works one bit at a time, simple implementation.
     void append_bit(bool bit);
     unsigned int read_bit();
 
