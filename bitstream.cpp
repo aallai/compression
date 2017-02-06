@@ -15,7 +15,6 @@ void bitstream::append(string const& bits)
     for (auto const& c : bits)
     {
         assert(c == '1' || c == '0');
-
         append_bit(c == '1');
     }
 }
