@@ -75,7 +75,7 @@ void engine::initialize_deltas(datapoint& first, datapoint& second, bitstream& s
 
     if (xor == 0)
     {
-        stream.append(0, 1);
+        stream.append("0");
     }
     else
     {
