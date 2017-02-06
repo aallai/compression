@@ -25,7 +25,7 @@ private:
     void initialize_deltas(datapoint& first, datapoint& second, bitstream& stream);
 
     uint64_t tn_1, tn_2, previous_value;
-    int previous_lz, previous_mb_length;
+    int previous_lz, previous_tz, previous_mb_length;
 };
 
 }

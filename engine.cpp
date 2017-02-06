@@ -1,5 +1,6 @@
 #include "engine.h"
 #include <cassert>
+#include <cstring>
 
 using namespace std;
 
@@ -9,7 +10,7 @@ namespace compression
 // Count leading zeroes.
 int clz(uint64_t value)
 {
-    int count = 64;
+    int count = 63;
 
     while (value >>= 1)
         count--;
@@ -20,7 +21,7 @@ int clz(uint64_t value)
 // Trailing zeros.
 int ctz(uint64_t value)
 {
-    int count = 64;
+    int count = 63;
 
     while (value <<= 1)
         count--;
@@ -28,6 +29,13 @@ int ctz(uint64_t value)
     return count;
 }
 
+// Apparently C-style type puns are undefined behavior in C++.
+uint64_t get_bits(double value)
+{
+    uint64_t bits;
+    memcpy(&bits, &value, sizeof(uint64_t));
+    return bits;
+}
 
 bitstream engine::compress(std::vector<datapoint> data)
 {
@@ -56,17 +64,18 @@ vector<datapoint> engine::decompress(bitstream&)
 
 void engine::initialize_deltas(datapoint& first, datapoint& second, bitstream& stream)
 {
-    // Casts like this are undefined behavior in C++.
-    uint64_t v1 = reinterpret_cast<uint64_t&>(first.value);
-    uint64_t v2 = reinterpret_cast<uint64_t&>(second.value);
+    auto v1 = get_bits(first.value);
+    auto v2 = get_bits(second.value);
 
     stream.append(first.timestamp, 64);
     stream.append(v1, 64);
 
-    // Initial delta is stored using 14 bits.
-    assert(second.timestamp - first.timestamp < 0x400);
+    auto delta = second.timestamp - first.timestamp;
 
-    stream.append(second.timestamp - first.timestamp, 14);
+    // Initial delta is stored using 14 bits.
+    assert(delta >= 0 && delta < 0x400);
+
+    stream.append(delta, 14);
 
     tn_1 = second.timestamp;
     tn_2 = first.timestamp;
@@ -80,19 +89,22 @@ void engine::initialize_deltas(datapoint& first, datapoint& second, bitstream& s
     else
     {
         previous_lz = clz(xor);
-        auto tz = ctz(xor);
-        previous_mb_length = 64 - previous_lz - tz;
+        previous_tz = ctz(xor);
+        previous_mb_length = 64 - previous_lz - previous_tz;
+        previous_value = v2;
 
         stream.append("11");
         stream.append(previous_lz, 6);
         stream.append(previous_mb_length, 6);
-        stream.append(xor >> tz, previous_mb_length);
+        stream.append(xor >> previous_tz, previous_mb_length);
     }
 }
 
 void engine::compress_timestamp(uint64_t timestamp, bitstream& stream)
 {
-    auto d = (timestamp - tn_1) - (tn_1 - tn_2);
+    int64_t d = (timestamp - tn_1) - (tn_1 - tn_2);
+
+    printf("d: %lld\n", d);
 
     if (d == 0)
     {
@@ -119,14 +131,50 @@ void engine::compress_timestamp(uint64_t timestamp, bitstream& stream)
 
     else
     {
-        assert(d < 0x100000000);
+        assert(d >=  INT32_MIN && d <= INT32_MAX);
         stream.append("1111");
         stream.append(d, 32);
     }
+
+    tn_2 = tn_1;
+    tn_1 = timestamp;
 }
 
-void engine::compress_value(double, bitstream&)
+void engine::compress_value(double value, bitstream& stream)
 {
+    auto v = get_bits(value);
+
+    auto xor = previous_value ^ v;
+
+    if (xor == 0)
+    {
+        stream.append("0");
+    }
+    else
+    {
+        auto lz = clz(xor);
+        auto tz = ctz(xor);
+        auto mb_length = 64 - lz - tz;
+
+        if (lz <= previous_lz && tz >= previous_tz)
+        {
+            stream.append("10");
+            stream.append(xor >> previous_tz, previous_mb_length);
+        }
+        else
+        {
+            stream.append("11");
+            stream.append(lz, 6);
+            stream.append(mb_length, 6);
+            stream.append(xor >> tz, mb_length);
+
+            previous_tz = tz;
+            previous_lz = lz;
+            previous_mb_length = mb_length;
+        }
+    }
+
+    previous_value = v;
 }
 
 }

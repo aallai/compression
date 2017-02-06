@@ -24,7 +24,7 @@ void bitstream::append(uint64_t bits, unsigned int width)
 {
     assert(width <= 64);
 
-    for (unsigned int i = --width; i >= 0; i--)
+    for (int i = --width; i >= 0; i--)
         append_bit((bits >> i) & 1);
 }
 
