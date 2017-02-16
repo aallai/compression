@@ -19,16 +19,17 @@ void bitstream::append(string const& bits)
     }
 }
 
-void bitstream::append(uint64_t bits, unsigned int width)
+void bitstream::append(uint64_t bits, uint64_t width)
 {
     assert(width <= 64);
 
-    for (int i = --width; i >= 0; i--)
+    for (uint64_t i = --width; i >= 0; i--)
         append_bit((bits >> i) & 1);
 }
 
-string bitstream::read_str(unsigned int width)
+string bitstream::read_str(uint64_t width)
 {
+    assert(num_unread_bits() >= width);
     vector<char> characters;
 
     for (unsigned int i = 0; i < width; i++)
@@ -37,9 +38,10 @@ string bitstream::read_str(unsigned int width)
     return string(characters.begin(), characters.end());
 }
 
-uint64_t bitstream::read_word(unsigned int width)
+uint64_t bitstream::read_word(uint64_t width)
 {
     assert(width <= 64);
+    assert(num_unread_bits() >= width);
 
     uint64_t word = 0;
 
@@ -91,6 +93,11 @@ uint64_t bitstream::size()
 bool bitstream::has_unread_bits()
 {
     return read_head < write_head;
+}
+
+uint64_t bitstream::num_unread_bits()
+{
+    return write_head - read_head - 1;
 }
 
 }

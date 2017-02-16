@@ -37,32 +37,188 @@ uint64_t get_bits(double value)
     return bits;
 }
 
+double get_bits(uint64_t value)
+{
+    double bits;
+    memcpy(&bits, &value, sizeof(double));
+    return bits;
+}
+
 bitstream engine::compress(std::vector<datapoint> data)
 {
     assert(data.size() > 1);
 
-    bitstream stream;
-    initialize_deltas(data[0], data[1], stream);
+    stream = bitstream();
+    initialize_deltas(data[0], data[1]);
 
     data.erase(data.begin());
     data.erase(data.begin());
 
     for (auto const& p : data)
     {
-        compress_timestamp(p.timestamp, stream);
-        compress_value(p.value, stream);
+        compress_timestamp(p.timestamp);
+        compress_value(p.value);
     }
 
     return stream;
 }
 
-vector<datapoint> engine::decompress(bitstream&)
+vector<datapoint> engine::decompress(bitstream& s)
 {
+    stream = s;
     vector<datapoint> data;
+
+    auto initial = decompress_initial_values();
+
+    data.insert(data.begin(), initial.begin(), initial.end());
+
+    while (stream.has_unread_bits())
+    {
+        datapoint d;
+        d.timestamp = decompress_timestamp();
+        d.value = decompress_value();
+        data.push_back(d);
+    }
+
     return data;
 }
 
-void engine::initialize_deltas(datapoint& first, datapoint& second, bitstream& stream)
+vector<datapoint> engine::decompress_initial_values()
+{
+    datapoint first, second;
+
+    first.timestamp = stream.read_word(64);
+    first.value = get_bits(stream.read_word(64));
+
+    second.timestamp = first.timestamp + stream.read_word(14);
+
+    auto bit = stream.read_str(1);
+
+    if (bit == "0")
+    {
+        second.value = first.value;
+    }
+    else
+    {
+        // Read out 1 bit.
+        stream.read_str(1);
+
+        previous_lz = stream.read_word(6);
+        previous_mb_length = stream.read_word(6);
+
+        assert(previous_lz + previous_mb_length <= 64);
+
+        previous_tz = 64 - previous_lz - previous_mb_length;
+
+        auto mb = stream.read_word(previous_mb_length);
+        auto xor = mb << previous_tz;
+
+        second.value = get_bits(get_bits(first.value) ^ xor);
+    }
+
+    tn_1 = second.timestamp;
+    tn_2 = first.timestamp;
+    previous_value = get_bits(second.value);
+
+    vector<datapoint> data;
+    data.push_back(first);
+    data.push_back(second);
+    return data;
+}
+
+uint64_t engine::decompress_timestamp()
+{
+    uint64_t d;
+    auto bit = stream.read_str(1);
+
+    if (bit == "0")
+    {
+        // 0
+        d = 0;
+    }
+    else
+    {
+        // 1
+        bit = stream.read_str(1);
+
+        if (bit == "0")
+        {
+            // 10
+            d = stream.read_word(7);
+        }
+        else
+        {
+            // 11
+            bit = stream.read_str(1);
+
+            if (bit == "0")
+            {
+                // 110
+                d = stream.read_word(9);
+            }
+            else
+            {
+                // 111
+                bit = stream.read_str(1);
+
+                if (bit == "0")
+                {
+                    // 1110
+                    d = stream.read_word(12);
+                }
+                else
+                {
+                    // 1111
+                    d = stream.read_word(32);
+                }
+            }
+        }
+    }
+
+    auto tn = d + 2 * tn_1 - tn_2;
+    tn_2 = tn_1;
+    tn_1 = tn;
+    return tn;
+}
+
+double engine::decompress_value()
+{
+    auto bit = stream.read_str(1);
+
+    if (bit == "0")
+    {
+        // 0
+        return get_bits(previous_value);
+    }
+    else
+    {
+        uint64_t xor;
+        bit = stream.read_str(1);
+
+        if (bit == "0")
+        {
+            // 10
+            xor = stream.read_word(previous_mb_length) << previous_tz;
+        }
+        else
+        {
+            // 11
+            previous_lz = stream.read_word(6);
+            previous_mb_length = stream.read_word(6);
+
+            assert(previous_lz + previous_mb_length <= 64);
+
+            previous_tz = 64 - previous_lz - previous_mb_length;
+
+            auto mb = stream.read_word(previous_mb_length);
+            xor = mb << previous_tz;
+        }
+
+        return get_bits(previous_value ^ xor);
+    }
+}
+
+void engine::initialize_deltas(datapoint& first, datapoint& second)
 {
     auto v1 = get_bits(first.value);
     auto v2 = get_bits(second.value);
@@ -100,11 +256,9 @@ void engine::initialize_deltas(datapoint& first, datapoint& second, bitstream& s
     }
 }
 
-void engine::compress_timestamp(uint64_t timestamp, bitstream& stream)
+void engine::compress_timestamp(uint64_t timestamp)
 {
     int64_t d = (timestamp - tn_1) - (tn_1 - tn_2);
-
-    printf("d: %lld\n", d);
 
     if (d == 0)
     {
@@ -140,7 +294,7 @@ void engine::compress_timestamp(uint64_t timestamp, bitstream& stream)
     tn_1 = timestamp;
 }
 
-void engine::compress_value(double value, bitstream& stream)
+void engine::compress_value(double value)
 {
     auto v = get_bits(value);
 

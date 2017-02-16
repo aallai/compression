@@ -12,14 +12,15 @@ public:
     bitstream();
 
     void append(std::string const& bits);
-    void append(uint64_t bits, unsigned int width);
+    void append(uint64_t bits, uint64_t width);
 
-    std::string read_str(unsigned int width);
-    uint64_t read_word(unsigned int width);
+    std::string read_str(uint64_t width);
+    uint64_t read_word(uint64_t width);
 
     void print();
     uint64_t size();
     bool has_unread_bits();
+    uint64_t num_unread_bits();
 
 private:
 
