@@ -6,7 +6,7 @@ using namespace std;
 namespace compression {
 
 bitstream::bitstream()
-    : write_head(0), read_head(0)
+    : write_head(0), read_head(0), buf(0)
 {
 }
 
@@ -23,7 +23,7 @@ void bitstream::append(uint64_t bits, uint64_t width)
 {
     assert(width <= 64);
 
-    for (uint64_t i = --width; i >= 0; i--)
+    for (int i = --width; i >= 0; i--)
         append_bit((bits >> i) & 1);
 }
 
@@ -97,7 +97,7 @@ bool bitstream::has_unread_bits()
 
 uint64_t bitstream::num_unread_bits()
 {
-    return write_head - read_head - 1;
+    return write_head - read_head;
 }
 
 }
